@@ -4,15 +4,15 @@
 import React, {useRef, useState} from 'react';
 import {
   View,
-  Text,
   StyleSheet,
-  StatusBar,
-  Image,
+  Platform,
+  PermissionsAndroid,
   Dimensions,
-  TouchableOpacity,
+  SafeAreaView,
 } from 'react-native';
 import {GooglePlacesAutocomplete} from 'react-native-google-places-autocomplete';
 import MapView, {Marker, PROVIDER_GOOGLE} from 'react-native-maps';
+import Geolocation from 'react-native-geolocation-service';
 import MapViewDirections from 'react-native-maps-directions';
 
 const {width, height} = Dimensions.get('window');
@@ -21,38 +21,81 @@ const LATITUDE_DELTA = 0.00005;
 const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
 
 const GOOGLE_MAPS_APIKEY = 'AIzaSyADLJmlQhEV2kUFlIaMToOx1UEEkuQ7dsY';
+navigator.geolocation = require('react-native-geolocation-service');
 
-const App = ({route, navigation: {navigate, goBack}}) => {
+const App = () => {
   const mapView = useRef();
-  const refRBSheet = useRef();
+  const [position, setPosition] = useState({
+    latitude: 6.5236,
+    longitude: 3.6006,
+  });
 
   const [coordinates, setCoordinates] = useState([
     {
-      latitude: parseFloat(route?.params?.position.latitude),
-      longitude: parseFloat(route?.params?.position.longitude),
+      latitude: 37.78825,
+      longitude: -122.4324,
       latitudeDelta: 0.007,
       longitudeDelta: 0.007,
     },
     {
-      latitude: parseFloat(route?.params?.position.latitude),
-      longitude: parseFloat(route?.params?.position.longitude),
+      latitude: 37.78825,
+      longitude: -122.4324,
       latitudeDelta: 0.007,
       longitudeDelta: 0.007,
     },
   ]);
 
+  const requestLocationPermission = async () => {
+    if (Platform.OS === 'ios') {
+      Geolocation.requestAuthorization('always');
+      Geolocation.setRNConfiguration({
+        skipPermissionRequests: false,
+        authorizationLevel: 'whenInUse',
+      });
+    }
+
+    if (Platform.OS === 'android') {
+      await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      );
+    }
+    await handleLocation();
+  };
+
+  const handleLocation = async () => {
+    Geolocation.getCurrentPosition(
+      position => {
+        console.log('position', position.coords);
+        const {latitude, longitude} = position.coords;
+        setPosition({
+          latitude: latitude,
+          longitude: longitude,
+        });
+      },
+      error => {
+        // See error code charts below.
+        console.log(error.code, error.message);
+      },
+      {enableHighAccuracy: true, timeout: 15000, maximumAge: 10000},
+    );
+  };
+
+  React.useEffect(() => {
+    requestLocationPermission();
+  }, []);
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <MapView
         ref={mapView} // eslint-disable-line react/jsx-no-bind
         style={{...StyleSheet.absoluteFillObject}}
         provider={PROVIDER_GOOGLE}
         showsUserLocation={true}
         region={{
-          latitude: parseFloat(route?.params?.position.latitude),
-          longitude: parseFloat(route?.params?.position.longitude),
-          latitudeDelta: 0.007,
-          longitudeDelta: 0.007,
+          latitude: position.latitude,
+          longitude: position.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
         }}>
         <MapViewDirections
           origin={coordinates[0]}
@@ -71,7 +114,7 @@ const App = ({route, navigation: {navigate, goBack}}) => {
           }}
           resetOnChange={false}
           language="en"
-          strokeColor={'lightBlue'}>
+          strokeColor={'red'}>
           <Marker
             coordinate={coordinates[0]}
             title={'Origin'}
@@ -84,15 +127,11 @@ const App = ({route, navigation: {navigate, goBack}}) => {
           />
         </MapViewDirections>
       </MapView>
-      <StatusBar backgroundColor={'lightBlue'} barStyle="light-content" />
-      <View>
-        <Text>Enter Destination</Text>
-      </View>
 
       <View style={styles.destinationContainer}>
         <View style={styles.location}>
           <GooglePlacesAutocomplete
-            placeholder="WHERE ARE YOU?"
+            placeholder="WHERE ARE YOU"
             minLength={2}
             onPress={(data, details = null) => {
               console.log(data, details, 'my origin');
@@ -106,19 +145,12 @@ const App = ({route, navigation: {navigate, goBack}}) => {
 
               setCoordinates(res);
             }}
-            placeholderTextColor="#707070"
-            styles={{
-              textInput: styles.textInput,
-              textInputContainer: styles.textInputContainer,
-            }}
             query={{
               key: GOOGLE_MAPS_APIKEY,
               language: 'en',
             }}
-            suppressDefaultStyles
-            enablePoweredByContainer={false}
             currentLocation={true}
-            currentLocationLabel="Current Location"
+            currentLocationLabel="Current location"
           />
         </View>
         <View style={styles.location}>
@@ -139,7 +171,6 @@ const App = ({route, navigation: {navigate, goBack}}) => {
                   latitude: details?.geometry?.location?.lat,
                 },
               ]);
-              setTimeout(() => refRBSheet.current.open(), 5000);
             }}
             minLength={2}
             debounce={200}
@@ -156,13 +187,8 @@ const App = ({route, navigation: {navigate, goBack}}) => {
               fields: 'formatted_address,geometry',
             }}
             fetchDetails
-            suppressDefaultStyles
             renderDescription={row => row.description}
             placeholder="WHERE ARE YOU GOING?"
-            styles={{
-              textInput: styles.textInput,
-              textInputContainer: styles.textInputContainer,
-            }}
             enablePoweredByContainer={false}
             query={{
               key: GOOGLE_MAPS_APIKEY,
@@ -171,7 +197,7 @@ const App = ({route, navigation: {navigate, goBack}}) => {
           />
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -242,7 +268,7 @@ const styles = StyleSheet.create({
   },
   requestButton: {
     height: 50,
-    backgroundColor: 'lightblue',
+    backgroundColor: 'yellow',
     width: 320,
     justifyContent: 'center',
     alignItems: 'center',
